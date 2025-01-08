@@ -1,15 +1,22 @@
-import { Button, Card, Col, Container, Form, Pagination, Row } from "react-bootstrap";
-import { listMovie, searchMovie } from "./api";
+import { Button, Card, Col, Container, Form, ListGroup, Modal, Pagination, Row } from "react-bootstrap";
+import { listMovie, detailMovie, searchMovie } from "./api";
 import "./App.css";
 import { useEffect, useState } from "react";
+// import ListCard from "./components/ListCard";
 
 function App() {
   const [popularMovies, setPopularMovies] = useState([]);
 
+  // Page
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [allMovies, setAllMovies] = useState([]);
-  const [currentSearch, setCurrentSearch] = useState("");
+  const [currentSearch, setCurrentSearch] = useState([]);
+
+  // Modal
+  const [lgShow, setLgShow] = useState(false);
+  const handleClose = () => setLgShow(false);
+  const [movieDetail, setMovieDetail] = useState(null);
 
   useEffect(() => {
     listMovie().then((result) => {
@@ -19,7 +26,7 @@ function App() {
     });
   }, []);
 
-  // Card
+  // List Movies
   const popularListMovie = () => {
     return popularMovies.map((movie) => (
       <Col key={movie.id} className="d-flex justify-content-center">
@@ -29,34 +36,105 @@ function App() {
             <Card.Title>{movie.title}</Card.Title>
             <Card.Text>{movie.release_date}</Card.Text>
             <Card.Text>Rating ⭐ {movie.vote_average}</Card.Text>
-            <Button variant="primary">Go somewhere</Button>
+            <Button onClick={() => handleDetailClick(movie.id)} variant="primary">
+              Detail...
+            </Button>
           </Card.Body>
         </Card>
       </Col>
     ));
   };
 
+  // Fungsi untuk mengambil detail movie
+  const handleDetailClick = async (movieId) => {
+    const detail = await detailMovie(movieId);
+    setMovieDetail(detail); // Simpan detail movie ke state
+    setLgShow(true); // Tampilkan modal
+    // console.log(movieId);
+  };
+
+  // Detail Movie
+  const popularDetailMovie = () => {
+    if (!movieDetail) return null;
+    return (
+      <Modal size="lg" centered show={lgShow} onHide={() => setLgShow(false)} aria-labelledby="example-modal-sizes-title-lg">
+        <Modal.Header closeButton>
+          <Modal.Title id="example-modal-sizes-title-lg">{movieDetail.title}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Row>
+            <Col md={4}>
+              <img src={`${process.env.REACT_APP_BASEIMGURL}/${movieDetail.poster_path}`} alt="gambar" className="img-fluid" />
+            </Col>
+            <Col md>
+              <ListGroup>
+                <ListGroup.Item>
+                  <strong>Release Year : </strong>
+                  {movieDetail.release_date}
+                </ListGroup.Item>
+                <ListGroup.Item>
+                  <strong>Genres : </strong>
+                  {movieDetail.genres &&
+                    movieDetail.genres.map((genre) => (
+                      <span key={genre.id}>
+                        {genre.name}
+                        {", "}
+                      </span>
+                    ))}
+                </ListGroup.Item>
+                <ListGroup.Item>
+                  <strong>Productions: </strong>
+                  {movieDetail.production_companies &&
+                    movieDetail.production_companies.map((produc) => (
+                      <span key={produc.id}>
+                        {produc.name}
+                        {", "}
+                      </span>
+                    ))}
+                </ListGroup.Item>
+                <ListGroup.Item>
+                  <strong>Rating : </strong>
+                  {movieDetail.vote_average}
+                </ListGroup.Item>
+                <ListGroup.Item>
+                  <strong>Overview : </strong>
+                  {movieDetail.overview}
+                </ListGroup.Item>
+              </ListGroup>
+            </Col>
+          </Row>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={handleClose}>
+            Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
+    );
+  };
+
   // Search
-  const search = async (s, page = 1) => {
-    if (s.length > 3) {
+  const search = async (s) => {
+    if (s.length > 4) {
       setCurrentSearch(s); // Simpan nilai pencarian saat ini
-      const query = await searchMovie(s, page);
-      setPopularMovies(query.results);
-      setTotalPages(query.total_pages);
-      setCurrentPage(page);
+      const results = await searchMovie(s);
+      setAllMovies(results); // Simpan semua hasil pencarian
+      setPopularMovies(results.slice(0, 10)); // Tampilkan hanya 10 hasil pertama
+      setTotalPages(Math.ceil(results.length / 10)); // Hitung jumlah halaman
+      setCurrentPage(1); // Reset halaman ke 1
     }
   };
 
   // console.log(popularMovies);
 
+  // Page Pagination
   const handlePageChange = (newPage) => {
     const startIndex = (newPage - 1) * 10;
     const endIndex = startIndex + 10;
     setPopularMovies(allMovies.slice(startIndex, endIndex));
     setCurrentPage(newPage);
-    search(currentSearch, newPage);
   };
-
+  // Pagination
   const pagination = () => {
     return (
       <Col className="d-flex justify-content-end">
@@ -83,15 +161,20 @@ function App() {
         </Row>
         <Row className="justify-content-center my-3">
           <Col md={6}>
-            <Form.Control onChange={({ target }) => search(target.value)} type="text" autoFocus placeholder="Search Movie..." className="border-secondary shadow search-input" />
+            <Form.Control onChange={({ target }) => search(target.value)} type="search" autoFocus placeholder="Search Movie..." className="border-secondary shadow search-input" />
           </Col>
         </Row>
 
         {/* Pagination Top */}
         <Row>{pagination()}</Row>
 
+        {/* {ListCard()} */}
+
         {/* Card */}
         <Row className="pt-4">{popularListMovie()}</Row>
+
+        {/* Modal Detail Movie */}
+        {movieDetail && popularDetailMovie()}
 
         {/* Pagination Bottom */}
         <Row>{pagination()}</Row>
